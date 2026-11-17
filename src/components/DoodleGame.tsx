@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { hostLinesFor } from "../lib/buildTiming";
 import type { Answers, TimingBlock } from "../types";
 import { HostPopup } from "./HostPopup";
@@ -18,7 +18,9 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
   const [hostText, setHostText] = useState<string | null>(null);
   const [showWaiter, setShowWaiter] = useState(false);
   const [showCoord, setShowCoord] = useState(false);
+  const [gastroReady, setGastroReady] = useState(true);
   const [doneStages, setDoneStages] = useState<Set<number>>(new Set());
+  const pendingAdvance = useRef(false);
 
   const lines = useMemo(
     () => hostLinesFor(blocks, answers),
@@ -28,36 +30,66 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
   const current = blocks[stage];
   const worldOffset = Math.max(0, stage * ROW - ROW * 2);
 
+  const advanceFrom = (index: number) => {
+    setDoneStages((prev) => new Set(prev).add(index));
+    if (index >= blocks.length - 1) {
+      window.setTimeout(onFinish, 700);
+      return;
+    }
+    window.setTimeout(() => {
+      setStage(index + 1);
+      setClicks(0);
+      setRevealed(0);
+    }, 450);
+  };
+
   useEffect(() => {
     const line = lines.find((l) => l.atStage === stage);
-    if (line) {
-      setHostText(line.text);
-    }
+    if (line) setHostText(line.text);
   }, [stage, lines]);
 
   useEffect(() => {
+    pendingAdvance.current = false;
     if (!current) return;
-    if (current.kind === "gastro") {
-      setShowWaiter(true);
+
+    if (current.kind !== "gastro") {
+      setShowWaiter(false);
       setShowCoord(false);
-      const t1 = window.setTimeout(() => {
-        setShowCoord(true);
-        setHostText(
-          "Координатор спасает сервировку — вино не прольётся на тайминг.",
-        );
-      }, 1200);
-      const t2 = window.setTimeout(() => {
-        setShowWaiter(false);
-        setShowCoord(false);
-      }, 4200);
-      return () => {
-        window.clearTimeout(t1);
-        window.clearTimeout(t2);
-      };
+      setGastroReady(true);
+      return;
     }
-    setShowWaiter(false);
+
+    setGastroReady(false);
+    setShowWaiter(true);
     setShowCoord(false);
-  }, [current]);
+
+    const tCoord = window.setTimeout(() => {
+      setShowCoord(true);
+      setHostText(
+        "Координатор спасает сервировку — вино не прольётся на тайминг.",
+      );
+    }, 900);
+
+    const tReady = window.setTimeout(() => {
+      setGastroReady(true);
+      if (pendingAdvance.current) {
+        pendingAdvance.current = false;
+        advanceFrom(stage);
+      }
+    }, 2200);
+
+    const tHide = window.setTimeout(() => {
+      setShowWaiter(false);
+      setShowCoord(false);
+    }, 4500);
+
+    return () => {
+      window.clearTimeout(tCoord);
+      window.clearTimeout(tReady);
+      window.clearTimeout(tHide);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, current?.kind]);
 
   const onPlatform = (index: number) => {
     if (index !== stage) return;
@@ -71,16 +103,11 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
 
     if (nextClicks >= 2) {
       setRevealed(2);
-      setDoneStages((prev) => new Set(prev).add(index));
-      if (index >= blocks.length - 1) {
-        window.setTimeout(onFinish, 700);
+      if (current?.kind === "gastro" && !gastroReady) {
+        pendingAdvance.current = true;
         return;
       }
-      window.setTimeout(() => {
-        setStage(index + 1);
-        setClicks(0);
-        setRevealed(0);
-      }, 450);
+      advanceFrom(index);
     }
   };
 
@@ -156,12 +183,20 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
           )}
 
           {showWaiter ? (
-            <div className="waiter" style={{ bottom: stage * ROW + 100 }}>
+            <div
+              className="waiter"
+              data-testid="waiter"
+              style={{ bottom: stage * ROW + 100 }}
+            >
               Официант разливает вино…
             </div>
           ) : null}
           {showCoord ? (
-            <div className="coordinator" style={{ bottom: stage * ROW + 100 }}>
+            <div
+              className="coordinator"
+              data-testid="coordinator"
+              style={{ bottom: stage * ROW + 100 }}
+            >
               Координатор спасает!
             </div>
           ) : null}
@@ -190,6 +225,11 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
                 </strong>
               </>
             ) : null}
+          </p>
+        ) : null}
+        {current?.kind === "gastro" && !gastroReady ? (
+          <p style={{ marginTop: "0.6rem", color: "var(--gold-soft)" }}>
+            Сцена сервиса: официант → координатор…
           </p>
         ) : null}
       </article>

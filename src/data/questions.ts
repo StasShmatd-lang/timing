@@ -50,18 +50,12 @@ const jubileeQuestions: Question[] = [
   {
     id: "hasLocation",
     title: "Локация уже выбрана?",
+    hint: "Если да — укажите название площадки на этом шаге.",
     type: "choice",
     options: [
       { label: "Да — добавим в тайминг", value: true },
       { label: "Пока нет", value: false },
     ],
-  },
-  {
-    id: "locationName",
-    title: "Название площадки",
-    type: "text",
-    placeholder: "Loft Hall",
-    when: (a) => a.hasLocation,
   },
   {
     id: "welcomeMinutes",
@@ -133,18 +127,12 @@ const weddingQuestions: Question[] = [
   {
     id: "hasLocation",
     title: "Локация выбрана?",
+    hint: "Если да — сразу впишите название площадки.",
     type: "choice",
     options: [
       { label: "Да", value: true },
       { label: "Ещё нет", value: false },
     ],
-  },
-  {
-    id: "locationName",
-    title: "Название площадки",
-    type: "text",
-    placeholder: "Усадьба / ресторан",
-    when: (a) => a.hasLocation,
   },
   {
     id: "welcomeMinutes",
@@ -230,18 +218,12 @@ const corporateQuestions: Question[] = [
   {
     id: "hasLocation",
     title: "Локация выбрана?",
+    hint: "Если да — укажите площадку здесь же.",
     type: "choice",
     options: [
       { label: "Да", value: true },
       { label: "Нет", value: false },
     ],
-  },
-  {
-    id: "locationName",
-    title: "Площадка",
-    type: "text",
-    placeholder: "Congress Hall",
-    when: (a) => a.hasLocation,
   },
   {
     id: "welcomeMinutes",

@@ -46,6 +46,11 @@ function canAdvance(answers: Answers, q: Question): boolean {
   }
   if (q.type === "number") return Number(v) > 0;
   if (q.id === "eventType") return Boolean(answers.eventType);
+  if (q.id === "hasLocation") {
+    if (v !== true && v !== false) return false;
+    if (v === true) return answers.locationName.trim().length > 0;
+    return true;
+  }
   return v !== null && v !== undefined && v !== "";
 }
 
@@ -155,6 +160,24 @@ export function Questionnaire({ answers, onPatch, onDone, onBack }: Props) {
               </button>
             );
           })}
+        </div>
+      ) : null}
+
+      {current.id === "hasLocation" && draft.hasLocation ? (
+        <div className="field" style={{ marginTop: "1rem" }}>
+          <label htmlFor="q-location">Название площадки</label>
+          <input
+            id="q-location"
+            type="text"
+            placeholder="Loft Hall, усадьба…"
+            value={draft.locationName}
+            onChange={(e) => {
+              const locationName = e.target.value;
+              const next = { ...draft, locationName };
+              setDraft(next);
+              onPatch({ locationName });
+            }}
+          />
         </div>
       ) : null}
 
