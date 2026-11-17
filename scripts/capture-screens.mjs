@@ -7,84 +7,81 @@ const outDirs = [
   "/workspace/docs/screenshots",
   "/opt/cursor/artifacts",
 ];
-
 for (const d of outDirs) fs.mkdirSync(d, { recursive: true });
 
 async function saveAll(page, name) {
-  const file = `${name}.png`;
   for (const d of outDirs) {
-    await page.screenshot({
-      path: path.join(d, file),
-      fullPage: true,
-    });
+    await page.screenshot({ path: path.join(d, `${name}.png`), fullPage: true });
   }
-  console.log("saved", file);
+  console.log("saved", name);
 }
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
-  viewport: { width: 1280, height: 900 },
-});
-
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await page.goto("http://127.0.0.1:5173/", { waitUntil: "networkidle" });
-await page.waitForTimeout(600);
+await page.waitForTimeout(500);
 await saveAll(page, "demo-party-start");
 
 await page.fill("#guest-name", "Анна");
 await page.getByRole("button", { name: "Взять демо-фото" }).click();
 await page.waitForSelector(".avatar-preview");
-await page.getByRole("button", { name: "Начать анкету" }).click();
+await page.getByRole("button", { name: /Начать/ }).click();
 
-await page.getByRole("button", { name: "Юбилей" }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
+await page.getByTestId("choice-jubilee").click();
+await page.getByTestId("quiz-next").click();
 await page.fill("#q-text", "Юбилей Анны");
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.getByRole("button", { name: "Вау-эффект и эмоции" }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
+await page.getByTestId("quiz-next").click();
+await page.getByTestId("choice-person").click();
+await page.getByTestId("quiz-next").click();
 await saveAll(page, "demo-party-quiz");
 
-await page.getByRole("button", { name: /Да — добавим/ }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.fill("#q-text", "Loft Hall");
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.getByRole("button", { name: "45 минут" }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.fill("#q-num", "80");
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.getByRole("button", { name: "Да", exact: true }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.getByRole("button", { name: "После welcome" }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.getByRole("button", { name: /фирменные/ }).click();
-await page.getByRole("button", { name: "Далее" }).click();
-
-await page.waitForSelector(".doodle-stage");
-await page.waitForTimeout(800);
-await saveAll(page, "demo-party-doodle");
-
-// Climb stages: two clicks per active platform
-for (let i = 0; i < 20; i++) {
-  const active = page.locator(".platform.is-active");
-  if ((await active.count()) === 0) break;
-  await active.click();
-  await page.waitForTimeout(250);
-  await active.click();
-  await page.waitForTimeout(700);
-  if (await page.locator(".timing-list").count()) break;
+const rest = [
+  ["choice", "wow"],
+  ["choice", "words"],
+  ["location", "Loft Hall"],
+  ["choice", "45"],
+  ["number", "80"],
+  ["choice", "true"],
+  ["choice", "false"],
+  ["choice", "moderate"],
+  ["choice", "welcome"],
+  ["choice", "true"],
+  ["choice", "warmup-2x30"],
+  ["choice", "true"],
+];
+for (const [t, v] of rest) {
+  if (t === "choice") await page.getByTestId(`choice-${v}`).click();
+  else if (t === "number") await page.fill("#q-num", v);
+  else if (t === "location") {
+    await page.getByTestId("choice-true").click();
+    await page.fill("#q-location", v);
+  }
+  await page.getByTestId("quiz-next").click();
+  await page.waitForTimeout(60);
 }
 
-await page.waitForSelector(".timing-list", { timeout: 20000 });
-await page.waitForTimeout(500);
-await saveAll(page, "demo-party-result");
+await page.waitForSelector("[data-testid=mario-stage]");
+await page.waitForTimeout(600);
+if (await page.getByRole("button", { name: "Понятно" }).count()) {
+  await page.getByRole("button", { name: "Понятно" }).click();
+}
+await saveAll(page, "demo-party-doodle");
 
+for (let i = 0; i < 30; i++) {
+  if (await page.locator(".timing-list").count()) break;
+  if (await page.getByRole("button", { name: "Понятно" }).count()) {
+    await page.getByRole("button", { name: "Понятно" }).click().catch(() => {});
+  }
+  const action = page.getByTestId("mario-action");
+  await action.click({ force: true });
+  await page.waitForTimeout(180);
+  await action.click({ force: true });
+  await page.waitForTimeout(200);
+  await action.click({ force: true });
+  await page.waitForTimeout(1000);
+}
+
+await page.waitForSelector(".timing-list", { timeout: 30000 });
+await saveAll(page, "demo-party-result");
 await browser.close();
 console.log("done");

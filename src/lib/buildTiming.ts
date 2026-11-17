@@ -1,3 +1,4 @@
+import { interpolate, peakLabel } from "../data/questions";
 import type { Answers, HostLine, TimingBlock } from "../types";
 
 function brandLabel(a: Answers): string {
@@ -7,17 +8,34 @@ function brandLabel(a: Answers): string {
   return a.eventTitle.trim() || "праздника";
 }
 
+function dancesBeforeDisco(a: Answers): boolean {
+  return a.danceArc === "warmup-2x30";
+}
+
+function discoBlocks(a: Answers): boolean {
+  return a.danceArc !== "single-60";
+}
+
+function weddingRitualsOn(a: Answers): boolean {
+  return a.ritualStyle !== "none" && a.eventType === "wedding";
+}
+
 export function buildTiming(a: Answers): TimingBlock[] {
   const blocks: TimingBlock[] = [];
   const label = brandLabel(a);
   const title = a.eventTitle.trim() || "праздник";
+  const peak = peakLabel(a.peakMoment) || "главный кадр";
+  const name = a.name.trim() || "герой";
 
   if (a.hasLocation && a.locationName.trim()) {
     blocks.push({
       id: "location",
-      title: `Сбор на площадке «${a.locationName.trim()}»`,
+      title: `Порог · ${a.locationName.trim()}`,
       minutes: 15,
-      description: `Гости прибывают на ${a.locationName.trim()}. Координатор встречает, ведущий держит мягкий контакт у входа.`,
+      description: interpolate(
+        `Гости входят на площадку «{title}». {name} встречает их лично: не бейдж, а взгляд. Всё, что вечером станет ${peak}, начинается с этого порога.`,
+        a,
+      ),
       highlight: a.locationName.trim(),
       kind: "location",
     });
@@ -27,7 +45,10 @@ export function buildTiming(a: Answers): TimingBlock[] {
     id: "welcome",
     title: `Welcome · ${a.welcomeMinutes} мин`,
     minutes: a.welcomeMinutes,
-    description: `Фуршет и лёгкое знакомство. Ведущий прогревает зал под настроение «${title}» — без микрофонной жёсткости, с вниманием к герою вечера.`,
+    description: interpolate(
+      `Фуршет «{title}» длится ровно столько, чтобы зал узнал себя. {name} держит фон, не сцену. Впереди ${peak} — Welcome его тихая рама. Гостей: ${a.guestCount}.`,
+      a,
+    ),
     highlight: `${a.guestCount} гостей`,
     kind: "welcome",
   });
@@ -36,8 +57,11 @@ export function buildTiming(a: Answers): TimingBlock[] {
     blocks.push({
       id: "boss",
       title: `Слово руководителя · ${label}`,
-      minutes: 10,
-      description: `Короткое официальное открытие от руководства ${label}. Зал настраивается на общий вектор вечера.`,
+      minutes: 8,
+      description: interpolate(
+        `Руководство «{company}» берёт микрофон коротко и по делу. Зал узнал свой год — дальше вечер живой, без второго протокола.`,
+        a,
+      ),
       highlight: label,
       kind: "toast",
     });
@@ -48,7 +72,10 @@ export function buildTiming(a: Answers): TimingBlock[] {
       id: "interactive",
       title: "Разговорный интерактив",
       minutes: 20,
-      description: `Живой диалог с залом: истории, микро-игры без сцены «конкурс ради конкурса». Акцент на именах и связях внутри «${title}».`,
+      description: interpolate(
+        `{name} задаёт залу «{title}» один вопрос, на который нельзя ответить «всё хорошо». Так вечер становится общим делом и дорогой к ${peak}.`,
+        a,
+      ),
       highlight: "контакт с залом",
       kind: "interactive",
     });
@@ -60,13 +87,16 @@ export function buildTiming(a: Answers): TimingBlock[] {
       a.eventType === "wedding"
         ? "Тосты и слово близких"
         : a.eventType === "corporate"
-          ? "Тосты и благодарности команде"
+          ? "Тосты и благодарности"
           : "Тосты от близких";
     blocks.push({
       id: "toast",
       title: toastTitle,
       minutes: 15,
-      description: `Микрофон у тех, кому есть что сказать. Ведущий держит ритм и бережно передаёт слово — чтобы «${title}» звучал тепло, а не затянуто.`,
+      description: interpolate(
+        `Слово берут те, кого «{title}» не может обойти. {name} следит за дыханием зала: коротко, по имени, без исповеди. К ${peak} эти речи подводят.`,
+        a,
+      ),
       kind: "toast",
     });
   };
@@ -82,22 +112,27 @@ export function buildTiming(a: Answers): TimingBlock[] {
   if (a.gastroPause) {
     blocks.push({
       id: "gastro",
-      title: "Гастропауза",
+      title: "Гастропауза · 15 мин",
       minutes: 15,
-      description:
-        "Сервис, смена блюд, тихий фон. Ведущий не занимает сцену — зал дышит. Здесь же появляется «официант с вином» в демо-игре.",
-      highlight: "15 минут",
+      description: interpolate(
+        `Сцена молчит пятнадцать минут: «{title}» имеет право есть. {name} не заполняет паузу. Бар (${a.alcoholLevel}) не спорит с ${peak}. В демо — официант с вином, координатор уже рядом.`,
+        a,
+      ),
+      highlight: "15 минут тишины",
       kind: "gastro",
     });
   }
 
-  if (a.eventType === "wedding" && a.weddingRituals) {
+  if (weddingRitualsOn(a)) {
     blocks.push({
       id: "rituals",
       title: "Свадебные обряды",
       minutes: 25,
-      description: `Каравай, семейный очаг или ваш семейный ритуал — оформляем как смысловой пик «${title}», а не как галочку в сценарии.`,
-      highlight: "тематический блок",
+      description: interpolate(
+        `Обряду «{title}» не нужна бодрая подводка. {name} держит тишину, пока семья делает свой знак. Часто именно здесь живёт ${peak}.`,
+        a,
+      ),
+      highlight: a.ritualStyle,
       kind: "ritual",
     });
   }
@@ -107,7 +142,10 @@ export function buildTiming(a: Answers): TimingBlock[] {
       id: "photo-meet",
       title: "Знакомство через фото",
       minutes: 20,
-      description: `Интерактив BIG event: коллеги ${label} находят друг друга по лицу на экране телефона. Лёгкий ice-breaker без неловких кругов «расскажи о себе».`,
+      description: interpolate(
+        `«{company}» знакомится через фото: лицо на экране вместо круга «расскажите о себе». {name} называет одно правило и отходит. Лёгкость до ${peak}.`,
+        a,
+      ),
       highlight: "наш продукт",
       kind: "photo",
     });
@@ -118,13 +156,16 @@ export function buildTiming(a: Answers): TimingBlock[] {
       id: "contests",
       title: `Эксклюзивные конкурсы · ${label}`,
       minutes: 25,
-      description: `Не шаблон из интернета — конкурсы, собранные под «${title}» и характер зала. Два-три ярких эпизода с понятной наградой.`,
+      description: interpolate(
+        `Два-три эпизода, которые нельзя перенести на чужой «{title}». {name} не привозит пакет. Награда простая, ставка — их ${peak}.`,
+        a,
+      ),
       highlight: label,
       kind: "contest",
     });
   }
 
-  if (a.dancesBeforeDisco) {
+  if (dancesBeforeDisco(a)) {
     blocks.push({
       id: "dance-warm",
       title:
@@ -132,18 +173,23 @@ export function buildTiming(a: Answers): TimingBlock[] {
           ? "Первый танец и разогрев"
           : "Танцевальный разогрев",
       minutes: 15,
-      description:
-        "Мягкий выход в движение: несколько треков, приглашение пар, подготовка к дискотеке без резкого скачка громкости.",
+      description: interpolate(
+        `Перед дискотекой «{title}» — мягкий разогрев. {name} зовёт в шаг, громкость не прыгает. Если ${peak} танцевальный — ему нужен разгон.`,
+        a,
+      ),
       kind: "dance",
     });
   }
 
-  if (a.discoBlocks) {
+  if (discoBlocks(a)) {
     blocks.push({
       id: "disco-1",
       title: "Дискотека · блок 1",
       minutes: 30,
-      description: "Первый танцевальный сет. Ведущий точечно поднимает зал, DJ держит линию.",
+      description: interpolate(
+        `Первый сет поднимает «{title}». {name} выходит точечно. Паркет зовут, не толкают.`,
+        a,
+      ),
       kind: "disco",
     });
     blocks.push({
@@ -157,25 +203,34 @@ export function buildTiming(a: Answers): TimingBlock[] {
       id: "disco-2",
       title: "Дискотека · блок 2",
       minutes: 30,
-      description: "Второй сет — пик энергии и финальные хиты вечера.",
+      description: interpolate(
+        `Второй сет не отпускает. ${peak} здесь либо вспыхивает, либо получает тело.`,
+        a,
+      ),
       kind: "disco",
     });
   } else {
     blocks.push({
       id: "disco",
-      title: "Дискотека",
+      title: "Дискотека · 60 мин",
       minutes: 60,
-      description: "Единый танцевальный блок без жёсткой нарезки — гибкий ритм под зал.",
+      description: interpolate(
+        `Один слитный час «{title}». Гибкий ритм без жёсткой нарезки — под дыхание зала.`,
+        a,
+      ),
       kind: "disco",
     });
   }
 
   blocks.push({
     id: "finale",
-    title: `Финал «${title}»`,
+    title: `Финал · ${title}`,
     minutes: 10,
-    description: `Благодарность залу, фото на память, мягкое закрытие. Имя ${a.name || "героя"} и название «${title}» звучат ещё раз.`,
-    highlight: a.name || title,
+    description: interpolate(
+      `{name} называет «{title}» в последний раз и не открывает новый сюжет. ${peak} не пересказывают — его оставляют в зале.`,
+      a,
+    ),
+    highlight: name,
     kind: "finale",
   });
 
@@ -193,47 +248,34 @@ export function formatClock(totalMin: number): string {
   return `${h} ч ${m.toString().padStart(2, "0")} мин`;
 }
 
+const HOST_BY_KIND: Record<string, string> = {
+  location: "Порог уже часть вечера. Гостей встречаем как людей этой ночи, не как поток.",
+  welcome: "Welcome не заполняет дыру. За эти минуты зал решает, дышит ли он.",
+  toast: "Микрофон только тем, у кого есть имя и одна мысль. Очередь «и я» гасим.",
+  interactive: "Один точный вопрос залу. Вечер становится разговором, не программой.",
+  gastro: "Пятнадцать минут тишины. Официант с вином уже в кадре — координатор тоже.",
+  ritual: "Обряд не объявляют бодро. Здесь зал говорит тише — и стоит.",
+  photo: "Знакомство лицами, не кругом «о себе». Наш ход, и он лёгкий.",
+  dance: "До двух сетов — короткий разогрев. Громкость не прыгает.",
+  disco: "Первый сет поднимает, пауза даёт воздух, второй забирает пик в тело.",
+  contest: "Конкурс живёт только внутри этой ночи. Чужой сценарий в зал не вносим.",
+  finale: "Закрываем одной фразой. Пик не пересказываем — его уносят с собой.",
+};
+
 export function hostLinesFor(blocks: TimingBlock[], a: Answers): HostLine[] {
   const title = a.eventTitle.trim() || "праздник";
   const lines: HostLine[] = [
     {
       id: "h0",
       atStage: 0,
-      text: `${a.name || "Друзья"}, начинаем подъём по таймингу «${title}». Два касания на этап — и текст откроется.`,
+      text: `${a.name || "Друзья"}, бежим по таймингу «${title}». Вперёд — как по уровню. Сзади остаётся пройденный вечер.`,
     },
   ];
 
   blocks.forEach((b, i) => {
-    if (b.kind === "gastro") {
-      lines.push({
-        id: `waiter-${i}`,
-        atStage: i,
-        text: "Осторожно: официант разливает вино на гастропаузе… Координатор уже рядом!",
-      });
-    } else if (b.kind === "welcome") {
-      lines.push({
-        id: `w-${i}`,
-        atStage: i,
-        text: "Welcome — это не «просто фуршет». Здесь рождается настроение всего вечера.",
-      });
-    } else if (b.kind === "contest") {
-      lines.push({
-        id: `c-${i}`,
-        atStage: i,
-        text: "Конкурсы только под ваш бренд — шаблонным вечеринкам здесь не место.",
-      });
-    } else if (b.kind === "photo") {
-      lines.push({
-        id: `p-${i}`,
-        atStage: i,
-        text: "Знакомство через фото — наш фирменный ход для корпоративов.",
-      });
-    } else if (i === blocks.length - 1) {
-      lines.push({
-        id: `f-${i}`,
-        atStage: i,
-        text: "Финишная прямая. Дальше — правка минут и PDF для согласования.",
-      });
+    const template = HOST_BY_KIND[b.kind];
+    if (template) {
+      lines.push({ id: `k-${i}`, atStage: i, text: interpolate(template, a) });
     }
   });
 

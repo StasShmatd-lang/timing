@@ -1,11 +1,8 @@
 export type EventType = "jubilee" | "wedding" | "corporate";
 export type Gender = "female" | "male";
 export type WelcomeDuration = 30 | 45 | 60;
-export type Phase =
-  | "start"
-  | "questionnaire"
-  | "doodle"
-  | "result";
+export type DanceArc = "warmup-2x30" | "sets-2x30" | "single-60";
+export type Phase = "start" | "questionnaire" | "doodle" | "result";
 
 export type Answers = {
   name: string;
@@ -14,19 +11,24 @@ export type Answers = {
   eventType: EventType | null;
   eventTitle: string;
   companyName: string;
+  heroFocus: string;
   goal: string;
+  peakMoment: string;
   hasLocation: boolean;
   locationName: string;
   welcomeMinutes: WelcomeDuration;
   guestCount: number;
   toasts: boolean;
   bossSpeech: boolean;
+  kidsPresent: boolean;
+  alcoholLevel: string;
+  teamMix: string;
   interactiveAfter: "welcome" | "first-toast";
   gastroPause: boolean;
   weddingRituals: boolean;
+  ritualStyle: string;
   corpPhotoMeet: boolean;
-  dancesBeforeDisco: boolean;
-  discoBlocks: boolean;
+  danceArc: DanceArc;
   exclusiveContests: boolean;
 };
 

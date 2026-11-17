@@ -9,18 +9,24 @@ type Props = {
   onFinish: () => void;
 };
 
-const ROW = 96;
+const SEG = 280;
+const GROUND = 72;
+const PLAYER_SIZE = 64;
 
 export function DoodleGame({ answers, blocks, onFinish }: Props) {
   const [stage, setStage] = useState(0);
-  const [clicks, setClicks] = useState(0);
+  const [playerX, setPlayerX] = useState(40);
+  const [running, setRunning] = useState(false);
   const [revealed, setRevealed] = useState(0);
+  const [clicks, setClicks] = useState(0);
   const [hostText, setHostText] = useState<string | null>(null);
   const [showWaiter, setShowWaiter] = useState(false);
   const [showCoord, setShowCoord] = useState(false);
   const [gastroReady, setGastroReady] = useState(true);
-  const [doneStages, setDoneStages] = useState<Set<number>>(new Set());
+  const [landed, setLanded] = useState(true);
+  const [hop, setHop] = useState(0);
   const pendingAdvance = useRef(false);
+  const animRef = useRef<number | null>(null);
 
   const lines = useMemo(
     () => hostLinesFor(blocks, answers),
@@ -28,20 +34,8 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
   );
 
   const current = blocks[stage];
-  const worldOffset = Math.max(0, stage * ROW - ROW * 2);
-
-  const advanceFrom = (index: number) => {
-    setDoneStages((prev) => new Set(prev).add(index));
-    if (index >= blocks.length - 1) {
-      window.setTimeout(onFinish, 700);
-      return;
-    }
-    window.setTimeout(() => {
-      setStage(index + 1);
-      setClicks(0);
-      setRevealed(0);
-    }, 450);
-  };
+  const worldWidth = Math.max(blocks.length * SEG + 400, 800);
+  const cameraX = Math.max(0, playerX - 160);
 
   useEffect(() => {
     const line = lines.find((l) => l.atStage === stage);
@@ -74,7 +68,7 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
       setGastroReady(true);
       if (pendingAdvance.current) {
         pendingAdvance.current = false;
-        advanceFrom(stage);
+        void runTo(stage + 1);
       }
     }, 2200);
 
@@ -91,28 +85,81 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, current?.kind]);
 
-  const onPlatform = (index: number) => {
-    if (index !== stage) return;
-    const nextClicks = clicks + 1;
-    setClicks(nextClicks);
+  const runTo = (nextIndex: number) =>
+    new Promise<void>((resolve) => {
+      if (running) {
+        resolve();
+        return;
+      }
+      if (nextIndex >= blocks.length) {
+        onFinish();
+        resolve();
+        return;
+      }
+      setRunning(true);
+      setLanded(false);
+      const target = 40 + nextIndex * SEG;
+      const start = playerX;
+      const dist = target - start;
+      const duration = Math.min(1100, 420 + Math.abs(dist) * 1.1);
+      const t0 = performance.now();
 
-    if (nextClicks === 1) {
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - t0) / duration);
+        const ease = 1 - Math.pow(1 - t, 3);
+        const x = start + dist * ease;
+        setPlayerX(x);
+        setHop(Math.sin(ease * Math.PI) * 42);
+        if (t < 1) {
+          animRef.current = requestAnimationFrame(tick);
+        } else {
+          setPlayerX(target);
+          setHop(0);
+          setStage(nextIndex);
+          setClicks(0);
+          setRevealed(0);
+          setRunning(false);
+          setLanded(true);
+          resolve();
+        }
+      };
+      animRef.current = requestAnimationFrame(tick);
+    });
+
+  useEffect(
+    () => () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    },
+    [],
+  );
+
+  const onRevealOrAdvance = () => {
+    if (running || !landed) return;
+
+    if (clicks === 0) {
+      setClicks(1);
       setRevealed(1);
       return;
     }
 
-    if (nextClicks >= 2) {
+    if (clicks === 1) {
+      setClicks(2);
       setRevealed(2);
-      if (current?.kind === "gastro" && !gastroReady) {
-        pendingAdvance.current = true;
-        return;
-      }
-      advanceFrom(index);
+      return;
     }
-  };
 
-  const playerBottom = stage * ROW + 78;
-  const playerLeft = stage % 2 === 0 ? "18%" : "72%";
+    // ready to run forward
+    if (current?.kind === "gastro" && !gastroReady) {
+      pendingAdvance.current = true;
+      return;
+    }
+
+    if (stage >= blocks.length - 1) {
+      onFinish();
+      return;
+    }
+    void runTo(stage + 1);
+  };
 
   const descParts = current
     ? [
@@ -121,72 +168,88 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
       ]
     : ["", ""];
 
+  const cta =
+    clicks < 2
+      ? clicks === 0
+        ? "Открыть смысл этапа"
+        : "Открыть продолжение"
+      : stage >= blocks.length - 1
+        ? "К итоговому таймингу"
+        : "Бежать дальше →";
+
   return (
-    <section className="doodle">
-      <div className="panel" style={{ paddingBottom: "0.85rem" }}>
-        <img
-          src="/brand/logo.png"
-          alt=""
-          style={{ width: 64, marginBottom: "0.5rem" }}
-        />
-        <h2 style={{ margin: 0 }}>Подъём по таймингу</h2>
-        <p className="lede" style={{ marginBottom: 0 }}>
-          Два касания на этап — аватар с вашим лицом поднимается выше. Текст
-          открывается постепенно.
+    <section className="mario">
+      <div className="panel mario__intro">
+        <img src="/brand/logo.png" alt="" style={{ width: 64 }} />
+        <h2>Пробег по таймингу</h2>
+        <p className="lede">
+          Аватар с вашим лицом бежит вперёд как по уровню. Пройденные этапы
+          остаются сзади. Два касания — смысл; затем — прыжок дальше.
         </p>
       </div>
 
-      <div className="doodle-stage">
+      <div className="mario-stage" data-testid="mario-stage">
         <div
-          className="doodle-world"
+          className="mario-world"
           style={{
-            height: blocks.length * ROW + 140,
-            bottom: 0,
-            top: "auto",
-            transform: `translateY(${worldOffset}px)`,
+            width: worldWidth,
+            transform: `translateX(${-cameraX}px)`,
           }}
         >
+          <div className="mario-sky" />
+          <div className="mario-ground" style={{ width: worldWidth }} />
+
           {blocks.map((b, i) => {
-            const bottom = i * ROW + 24;
+            const left = 40 + i * SEG;
+            const past = i < stage;
             const active = i === stage;
-            const done = doneStages.has(i);
             return (
-              <button
+              <div
                 key={b.id}
-                type="button"
-                className={`platform ${active ? "is-active" : ""} ${done ? "is-done" : ""}`}
-                style={{ bottom }}
-                onClick={() => onPlatform(i)}
+                className={`mario-flag ${past ? "is-past" : ""} ${active ? "is-active" : ""}`}
+                style={{ left }}
               >
-                <span className="platform__title">{b.title}</span>
-                <span className="platform__meta">{b.minutes} мин</span>
-              </button>
+                <div className="mario-flag__pole" />
+                <div className="mario-flag__plate">
+                  <strong>{b.title}</strong>
+                  <span>{b.minutes} мин</span>
+                </div>
+              </div>
             );
           })}
 
-          {answers.photoDataUrl ? (
-            <img
-              className="player"
-              src={answers.photoDataUrl}
-              alt={answers.name}
-              style={{ bottom: playerBottom, left: playerLeft }}
-            />
-          ) : (
+          {/* trail dust behind */}
+          {blocks.slice(0, stage).map((b, i) => (
             <div
-              className="player player-fallback"
-              style={{ bottom: playerBottom, left: playerLeft }}
-              aria-label={answers.name}
-            >
-              {answers.name.trim().slice(0, 1).toUpperCase() ||
-                (answers.gender === "female" ? "А" : "И")}
-            </div>
-          )}
+              key={`trail-${b.id}`}
+              className="mario-trail"
+              style={{ left: 40 + i * SEG }}
+            />
+          ))}
+
+          <div
+            className={`mario-player ${running ? "is-running" : ""}`}
+            style={{
+              left: playerX,
+              bottom: GROUND + 8 + hop,
+              width: PLAYER_SIZE,
+              height: PLAYER_SIZE,
+            }}
+          >
+            {answers.photoDataUrl ? (
+              <img src={answers.photoDataUrl} alt={answers.name} />
+            ) : (
+              <span>
+                {answers.name.trim().slice(0, 1).toUpperCase() || "?"}
+              </span>
+            )}
+          </div>
 
           {showWaiter ? (
             <div
               className="waiter"
               data-testid="waiter"
-              style={{ bottom: stage * ROW + 100 }}
+              style={{ left: playerX + 90, bottom: GROUND + 90 }}
             >
               Официант разливает вино…
             </div>
@@ -195,7 +258,7 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
             <div
               className="coordinator"
               data-testid="coordinator"
-              style={{ bottom: stage * ROW + 100 }}
+              style={{ left: playerX - 40, bottom: GROUND + 90 }}
             >
               Координатор спасает!
             </div>
@@ -204,6 +267,14 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
       </div>
 
       <article className="stage-card">
+        <div className="mario-progress-dots">
+          {blocks.map((b, i) => (
+            <span
+              key={b.id}
+              className={i < stage ? "done" : i === stage ? "now" : ""}
+            />
+          ))}
+        </div>
         <h3>{current?.title}</h3>
         {revealed >= 1 ? (
           <p className="reveal-line">
@@ -211,7 +282,7 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
           </p>
         ) : (
           <p style={{ color: "var(--mist)" }}>
-            Коснитесь активной площадки — откроется первая часть описания.
+            Коснитесь кнопки — откроется первая часть режиссуры этапа.
           </p>
         )}
         {revealed >= 2 ? (
@@ -232,6 +303,18 @@ export function DoodleGame({ answers, blocks, onFinish }: Props) {
             Сцена сервиса: официант → координатор…
           </p>
         ) : null}
+
+        <div className="btn-row" style={{ marginTop: "1rem" }}>
+          <button
+            type="button"
+            className="btn"
+            data-testid="mario-action"
+            disabled={running}
+            onClick={onRevealOrAdvance}
+          >
+            {cta}
+          </button>
+        </div>
       </article>
 
       <HostPopup text={hostText} onClose={() => setHostText(null)} />

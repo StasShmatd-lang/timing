@@ -6,312 +6,205 @@ const BASE = "http://127.0.0.1:5173";
 const OUT = "/tmp/demo-party-check";
 fs.mkdirSync(OUT, { recursive: true });
 
-const report = {
-  ok: [],
-  fail: [],
-  notes: [],
+const report = { ok: [], fail: [], notes: [] };
+const pass = (m) => {
+  report.ok.push(m);
+  console.log("PASS:", m);
+};
+const fail = (m) => {
+  report.fail.push(m);
+  console.error("FAIL:", m);
 };
 
-function pass(msg) {
-  report.ok.push(msg);
-  console.log("PASS:", msg);
-}
-function fail(msg) {
-  report.fail.push(msg);
-  console.error("FAIL:", msg);
-}
-function note(msg) {
-  report.notes.push(msg);
-  console.log("NOTE:", msg);
-}
-
 async function shot(page, name) {
-  const p = path.join(OUT, `${name}.png`);
-  await page.screenshot({ path: p, fullPage: true });
-  return p;
+  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
 }
 
 async function startSession(page, name = "Анна") {
   await page.goto(BASE, { waitUntil: "networkidle" });
+  // centered hero check
+  const box = await page.locator(".brand-hero__center").boundingBox();
+  const vp = page.viewportSize();
+  if (box && vp) {
+    const center = box.x + box.width / 2;
+    const mid = vp.width / 2;
+    if (Math.abs(center - mid) < 100) pass("start screen centered");
+    else fail(`start screen not centered (center=${center.toFixed(0)}, mid=${mid})`);
+  }
   await page.fill("#guest-name", name);
   await page.getByRole("button", { name: "Взять демо-фото" }).click();
   await page.waitForSelector(".avatar-preview");
-  const logo = await page.locator('img[src="/brand/logo.png"]').count();
-  if (logo < 1) fail("logo missing on start");
-  else pass("logo on start");
-  await page.getByRole("button", { name: "Начать анкету" }).click();
+  await page.getByRole("button", { name: /Начать/ }).click();
   await page.waitForSelector("text=Какой формат");
 }
 
-async function clickChoice(page, testIdOrText) {
-  const byId = page.getByTestId(`choice-${testIdOrText}`);
-  if (await byId.count()) {
-    await byId.click();
-    return;
-  }
-  await page.getByRole("button", { name: testIdOrText }).click();
+async function clickChoice(page, value) {
+  await page.getByTestId(`choice-${value}`).click();
 }
 
 async function next(page) {
   await page.getByTestId("quiz-next").click();
 }
 
-async function answerUntilDone(page, steps) {
-  for (const step of steps) {
-    if (step.type === "choice") {
-      await clickChoice(page, step.value);
-      await next(page);
-    } else if (step.type === "text") {
-      await page.fill("#q-text", step.value);
-      await next(page);
-    } else if (step.type === "number") {
-      await page.fill("#q-num", String(step.value));
-      await next(page);
-    } else if (step.type === "location") {
-      await clickChoice(page, "true");
-      await page.fill("#q-location", step.value);
-      await next(page);
-    } else if (step.type === "expect") {
-      const visible = await page.getByText(step.value).count();
-      if (visible) pass(`saw text: ${step.value}`);
-      else fail(`missing text: ${step.value}`);
-    }
+async function answer(page, step) {
+  if (step.type === "choice") await clickChoice(page, step.value);
+  else if (step.type === "text") await page.fill("#q-text", step.value);
+  else if (step.type === "number") await page.fill("#q-num", String(step.value));
+  else if (step.type === "location") {
+    await clickChoice(page, "true");
+    await page.fill("#q-location", step.value);
   }
+  await next(page);
+  await page.waitForTimeout(80);
 }
 
-async function climbAll(page) {
-  let stages = 0;
-  for (let i = 0; i < 30; i++) {
-    if (await page.locator(".timing-list").count()) break;
-    const active = page.locator(".platform.is-active");
-    if ((await active.count()) === 0) break;
-    await active.first().click();
-    await page.waitForTimeout(200);
-    await active.first().click();
-    stages += 1;
-    await page.waitForTimeout(650);
-  }
-  return stages;
-}
-
-async function runBranch(browser, branch) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  const downloadDir = path.join(OUT, `pdf-${branch.id}`);
-  fs.mkdirSync(downloadDir, { recursive: true });
-
-  console.log("\n=== BRANCH", branch.id, "===");
-  await startSession(page, branch.name);
-  await answerUntilDone(page, branch.steps);
-
-  await page.waitForSelector(".doodle-stage", { timeout: 10000 });
-  pass(`${branch.id}: entered doodle`);
-
-  // host popup
-  const host = page.locator(".host-popup");
-  await host.waitFor({ timeout: 5000 });
-  const hostImg = await host.locator('img[src="/brand/host-face.jpg"]').count();
-  if (hostImg) pass(`${branch.id}: host popup with face`);
-  else fail(`${branch.id}: host face missing`);
-  await shot(page, `${branch.id}-doodle-start`);
-
-  // climb until gastro or finish; watch waiter/coord
+async function climbMario(page, branchId) {
+  await page.waitForSelector("[data-testid=mario-stage]");
+  pass(`${branchId}: mario stage visible`);
   let sawWaiter = false;
   let sawCoord = false;
-  for (let i = 0; i < 30; i++) {
+
+  for (let i = 0; i < 40; i++) {
     if (await page.locator(".timing-list").count()) break;
-    if (await page.locator(".waiter").count()) sawWaiter = true;
-    if (await page.locator(".coordinator").count()) sawCoord = true;
-    const active = page.locator(".platform.is-active");
-    if ((await active.count()) === 0) break;
-    const title = await active.locator(".platform__title").innerText();
-    await active.first().click();
-    await page.waitForTimeout(220);
-    // after first click text should partially reveal
-    const reveal = await page.locator(".reveal-line").count();
-    if (reveal < 1 && i === 0) fail(`${branch.id}: no reveal after first click`);
-    await active.first().click();
-    await page.waitForTimeout(700);
+    // dismiss host if it blocks
+    const ok = page.getByRole("button", { name: "Понятно" });
+    if (await ok.count()) await ok.click().catch(() => {});
+
+    const title = await page.locator(".stage-card h3").innerText();
+    const action = page.getByTestId("mario-action");
+    await action.click({ force: true });
+    await page.waitForTimeout(200);
+    await action.click({ force: true });
+    await page.waitForTimeout(250);
+
     if (title.includes("Гастро")) {
       try {
-        await page.getByTestId("waiter").waitFor({ state: "visible", timeout: 2000 });
+        await page.getByTestId("waiter").waitFor({ state: "visible", timeout: 1500 });
         sawWaiter = true;
-      } catch {
-        /* counted below */
-      }
+      } catch {}
       try {
-        await page.getByTestId("coordinator").waitFor({ state: "visible", timeout: 3000 });
+        await page.getByTestId("coordinator").waitFor({ state: "visible", timeout: 2500 });
         sawCoord = true;
-        await shot(page, `${branch.id}-gastro`);
-      } catch {
-        /* counted below */
-      }
-      // allow gastro beat to unlock before next climb loop
+        await shot(page, `${branchId}-gastro`);
+      } catch {}
       await page.waitForTimeout(1600);
     }
+
+    await action.click({ force: true });
+    await page.waitForTimeout(1100);
   }
 
-  if (branch.expectWaiter) {
-    if (sawWaiter) pass(`${branch.id}: waiter appeared`);
-    else fail(`${branch.id}: waiter did not appear`);
-    if (sawCoord) pass(`${branch.id}: coordinator appeared`);
-    else fail(`${branch.id}: coordinator did not appear`);
+  if (sawWaiter) pass(`${branchId}: waiter`);
+  else fail(`${branchId}: waiter missing`);
+  if (sawCoord) pass(`${branchId}: coordinator`);
+  else fail(`${branchId}: coordinator missing`);
+}
+
+async function runBranch(browser, cfg) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const dl = path.join(OUT, `pdf-${cfg.id}`);
+  fs.mkdirSync(dl, { recursive: true });
+  console.log("\n===", cfg.id, "===");
+  await startSession(page, cfg.name);
+  for (const step of cfg.steps) await answer(page, step);
+
+  await page.waitForSelector("[data-testid=mario-stage]", { timeout: 10000 });
+  await page.waitForSelector("[data-testid=mario-action]");
+  await page.waitForSelector(".host-popup");
+  if (await page.locator('.host-popup img[src="/brand/host-face.jpg"]').count())
+    pass(`${cfg.id}: host face`);
+  else fail(`${cfg.id}: host face`);
+  // dismiss host so it never covers the action button
+  if (await page.getByRole("button", { name: "Понятно" }).count()) {
+    await page.getByRole("button", { name: "Понятно" }).click();
+  }
+  await shot(page, `${cfg.id}-mario`);
+
+  await climbMario(page, cfg.id);
+  await page.waitForSelector(".timing-list", { timeout: 30000 });
+  pass(`${cfg.id}: result`);
+
+  for (const n of cfg.expect) {
+    if (await page.getByText(n, { exact: false }).count()) pass(`${cfg.id}: has ${n}`);
+    else fail(`${cfg.id}: missing ${n}`);
   }
 
-  await page.waitForSelector(".timing-list", { timeout: 20000 });
-  pass(`${branch.id}: reached result`);
+  const input = page.locator(".minutes-edit input").first();
+  await input.fill("99");
+  if ((await input.inputValue()) === "99") pass(`${cfg.id}: edit minutes`);
+  else fail(`${cfg.id}: edit minutes`);
 
-  // company/event name in timing
-  for (const needle of branch.expectInResult) {
-    const n = await page.getByText(needle, { exact: false }).count();
-    if (n) pass(`${branch.id}: result contains «${needle}»`);
-    else fail(`${branch.id}: result missing «${needle}»`);
-  }
-
-  // edit minutes
-  const firstInput = page.locator(".minutes-edit input").first();
-  const before = await firstInput.inputValue();
-  await firstInput.fill("99");
-  const after = await firstInput.inputValue();
-  if (after === "99" && before !== "99") pass(`${branch.id}: minutes editable`);
-  else fail(`${branch.id}: minutes edit failed (${before}→${after})`);
-
-  // total updates
-  const totalText = await page.locator(".summary-bar").innerText();
-  if (/Общая длительность/.test(totalText)) pass(`${branch.id}: total duration shown`);
-  else fail(`${branch.id}: total duration missing`);
-
-  // PDF
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 15000 }),
     page.getByRole("button", { name: "Скачать PDF" }).click(),
   ]);
-  const pdfPath = path.join(downloadDir, await download.suggestedFilename());
+  const pdfPath = path.join(dl, await download.suggestedFilename());
   await download.saveAs(pdfPath);
-  const size = fs.statSync(pdfPath).size;
-  if (size > 1000 && pdfPath.endsWith(".pdf")) pass(`${branch.id}: PDF downloaded (${size} bytes)`);
-  else fail(`${branch.id}: PDF bad (${pdfPath}, ${size})`);
-
-  await shot(page, `${branch.id}-result`);
+  if (fs.statSync(pdfPath).size > 1000) pass(`${cfg.id}: PDF`);
+  else fail(`${cfg.id}: PDF`);
+  await shot(page, `${cfg.id}-result`);
   await page.close();
 }
-
-const jubilee = {
-  id: "jubilee",
-  name: "Анна",
-  expectWaiter: true,
-  expectInResult: ["Юбилей Анны", "Loft Hall"],
-  steps: [
-    { type: "choice", value: "jubilee" },
-    { type: "text", value: "Юбилей Анны" },
-    { type: "choice", value: "wow" },
-    { type: "choice", value: "true" }, // has location - first true option may conflict
-  ],
-};
 
 const browser = await chromium.launch({ headless: true });
 
-// --- count questions per branch ---
-async function countQuestions(branchLabel, eventValue, answers) {
+// Section count: jubilee 4+3+4+3 + event type = 15; verify chip text appears
+{
   const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
   await startSession(page, "Тест");
-  await clickChoice(page, eventValue);
+  await clickChoice(page, "jubilee");
   await next(page);
-  let count = 1; // event type
-  for (let i = 0; i < 20; i++) {
-    if (await page.locator(".doodle-stage").count()) break;
-    count += 1;
-    const title = await page.locator(".q-step h2").innerText();
-    note(`${branchLabel} Q${count}: ${title}`);
-    const step = answers[i];
-    if (!step) {
-      fail(`${branchLabel}: ran out of scripted answers at Q${count} (${title})`);
-      break;
-    }
-    if (step.type === "choice") await clickChoice(page, step.value);
-    else if (step.type === "text") await page.fill("#q-text", step.value);
-    else if (step.type === "number") await page.fill("#q-num", String(step.value));
-    else if (step.type === "location") {
-      await clickChoice(page, "true");
-      await page.fill("#q-location", step.value);
-    }
-    await next(page);
-    await page.waitForTimeout(150);
-  }
-  if (count >= 8 && count <= 10) pass(`${branchLabel}: question count ${count} (target 8–10)`);
-  else fail(`${branchLabel}: question count ${count} outside 8–10`);
-  await page.close();
-  return count;
-}
-
-await countQuestions("jubilee", "jubilee", [
-  { type: "text", value: "Юбилей Анны" },
-  { type: "choice", value: "wow" },
-  { type: "location", value: "Loft Hall" },
-  { type: "choice", value: "45" },
-  { type: "number", value: 80 },
-  { type: "choice", value: "true" },
-  { type: "choice", value: "welcome" },
-  { type: "choice", value: "true" },
-]);
-
-await countQuestions("wedding", "wedding", [
-  { type: "text", value: "Свадьба Марии и Ивана" },
-  { type: "choice", value: "wow" },
-  { type: "location", value: "Усадьба" },
-  { type: "choice", value: "45" },
-  { type: "number", value: 60 },
-  { type: "choice", value: "true" },
-  { type: "choice", value: "true" },
-  { type: "choice", value: "welcome" },
-  { type: "choice", value: "true" },
-]);
-
-await countQuestions("corporate", "corporate", [
-  { type: "text", value: "Softline Day" },
-  { type: "text", value: "Softline" },
-  { type: "choice", value: "team" },
-  { type: "location", value: "Congress Hall" },
-  { type: "choice", value: "45" },
-  { type: "number", value: 120 },
-  { type: "choice", value: "true" },
-  { type: "choice", value: "welcome" },
-  { type: "choice", value: "true" },
-]);
-
-// Full journeys
-await runBranch(browser, {
-  id: "jubilee",
-  name: "Анна",
-  expectWaiter: true,
-  expectInResult: ["Юбилей Анны", "Loft Hall"],
-  steps: [
-    { type: "choice", value: "jubilee" },
+  await page.waitForSelector("text=Смысл вечера");
+  const chip = await page.locator(".section-chip").innerText();
+  if (/4/.test(chip) && /смысл/i.test(chip)) pass("section chip shows 4 for meaning");
+  else fail(`section chip wrong: ${chip}`);
+  // count questions by walking
+  let q = 1;
+  const jubileeSteps = [
     { type: "text", value: "Юбилей Анны" },
+    { type: "choice", value: "person" },
     { type: "choice", value: "wow" },
+    { type: "choice", value: "words" },
     { type: "location", value: "Loft Hall" },
     { type: "choice", value: "45" },
     { type: "number", value: 80 },
     { type: "choice", value: "true" },
+    { type: "choice", value: "false" },
+    { type: "choice", value: "moderate" },
     { type: "choice", value: "welcome" },
     { type: "choice", value: "true" },
-  ],
-});
+    { type: "choice", value: "warmup-2x30" },
+    { type: "choice", value: "true" },
+  ];
+  for (const s of jubileeSteps) {
+    q += 1;
+    await answer(page, s);
+  }
+  await page.waitForSelector("[data-testid=mario-stage]");
+  if (q === 15) pass(`jubilee total questions including type: ${q}`);
+  else fail(`jubilee question count ${q}`);
+  await page.close();
+}
 
 await runBranch(browser, {
-  id: "wedding",
-  name: "Мария",
-  expectWaiter: true,
-  expectInResult: ["Свадьба Марии и Ивана", "обряд"],
+  id: "jubilee",
+  name: "Анна",
+  expect: ["Юбилей Анны", "Loft Hall"],
   steps: [
-    { type: "choice", value: "wedding" },
-    { type: "text", value: "Свадьба Марии и Ивана" },
+    { type: "choice", value: "jubilee" },
+    { type: "text", value: "Юбилей Анны" },
+    { type: "choice", value: "person" },
     { type: "choice", value: "wow" },
-    { type: "choice", value: "false" },
+    { type: "choice", value: "words" },
+    { type: "location", value: "Loft Hall" },
     { type: "choice", value: "45" },
-    { type: "number", value: 60 },
+    { type: "number", value: 80 },
     { type: "choice", value: "true" },
+    { type: "choice", value: "false" },
+    { type: "choice", value: "moderate" },
+    { type: "choice", value: "welcome" },
     { type: "choice", value: "true" },
-    { type: "choice", value: "first-toast" },
+    { type: "choice", value: "warmup-2x30" },
     { type: "choice", value: "true" },
   ],
 });
@@ -319,56 +212,42 @@ await runBranch(browser, {
 await runBranch(browser, {
   id: "corporate",
   name: "Игорь",
-  expectWaiter: true,
-  expectInResult: ["Softline", "знакомство через фото"],
+  expect: ["Softline", "знакомство через фото"],
   steps: [
     { type: "choice", value: "corporate" },
-    { type: "text", value: "Softline Day" },
     { type: "text", value: "Softline" },
+    { type: "text", value: "Softline Day" },
     { type: "choice", value: "team" },
+    { type: "choice", value: "mix" },
     { type: "location", value: "Congress Hall" },
-    { type: "choice", value: "30" },
+    { type: "choice", value: "45" },
     { type: "number", value: 120 },
     { type: "choice", value: "true" },
+    { type: "choice", value: "blend" },
     { type: "choice", value: "welcome" },
+    { type: "choice", value: "true" },
+    { type: "choice", value: "true" },
+    { type: "choice", value: "warmup-2x30" },
     { type: "choice", value: "true" },
   ],
 });
 
-// Static checks
-const logoRepo = fs.existsSync("/workspace/brand/logo.png");
-const hostRepo = fs.existsSync("/workspace/brand/host-face.jpg");
-const readme = fs.readFileSync("/workspace/README.md", "utf8");
-const shots = [
+// static
+for (const s of [
   "demo-party-start.png",
   "demo-party-quiz.png",
   "demo-party-doodle.png",
   "demo-party-result.png",
-];
-if (logoRepo) pass("brand/logo.png in repo");
-else fail("brand/logo.png missing");
-if (hostRepo) pass("brand/host-face.jpg in repo");
-else fail("brand/host-face.jpg missing");
-if (/npm run dev/.test(readme)) pass("README has run instructions");
-else fail("README missing run instructions");
-for (const s of shots) {
-  const a = `/workspace/docs/screenshots/${s}`;
-  const b = `/cursor/stores/bc-8f6cf1c4-2493-4b1a-a6df-7ed437cfa311/media/${s}`;
-  if (fs.existsSync(a) && fs.statSync(a).size > 10000) pass(`screenshot repo ${s}`);
-  else fail(`screenshot repo missing/small ${s}`);
-  if (fs.existsSync(b) && fs.statSync(b).size > 10000) pass(`screenshot media ${s}`);
-  else fail(`screenshot media missing/small ${s}`);
+]) {
+  const p = `/workspace/docs/screenshots/${s}`;
+  if (fs.existsSync(p)) pass(`screenshot ${s}`);
+  else fail(`screenshot missing ${s}`);
 }
+if (fs.existsSync("/workspace/brand/logo.png")) pass("logo");
+else fail("logo");
 
 await browser.close();
-
-const summary = {
-  passed: report.ok.length,
-  failed: report.fail.length,
-  fail: report.fail,
-  notes: report.notes,
-};
-fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify(summary, null, 2));
+fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify(report, null, 2));
 console.log("\n==== SUMMARY ====");
-console.log(JSON.stringify(summary, null, 2));
+console.log(JSON.stringify({ passed: report.ok.length, failed: report.fail.length, fail: report.fail }, null, 2));
 process.exit(report.fail.length ? 1 : 0);

@@ -65,8 +65,8 @@ export function StartScreen({
   const ready = name.trim().length >= 2 && Boolean(photoDataUrl);
 
   return (
-    <section className="brand-hero">
-      <div className="brand-hero__copy">
+    <section className="brand-hero brand-hero--center">
+      <div className="brand-hero__center">
         <img
           className="brand-logo"
           src="/brand/logo.png"
@@ -74,8 +74,8 @@ export function StartScreen({
         />
         <h1>Демо вашего праздника</h1>
         <p>
-          Вместе с ведущим собираем тайминг: короткая анкета, подъём по этапам
-          и PDF для согласования.
+          Ведущий рядом. Собираем смысл вечера, пробегаем тайминг как уровень —
+          и уносите PDF.
         </p>
 
         <div className="panel start-form">
@@ -91,7 +91,7 @@ export function StartScreen({
           </div>
 
           <div className="field">
-            <label>Пол для силуэта игрока</label>
+            <label>Силуэт игрока</label>
             <div className="gender-row">
               <button
                 type="button"
@@ -111,7 +111,7 @@ export function StartScreen({
           </div>
 
           <div className="field">
-            <label htmlFor="face">Фото лица</label>
+            <label htmlFor="face">Фото лица для аватара</label>
             <input
               id="face"
               ref={fileRef}
@@ -134,7 +134,7 @@ export function StartScreen({
                 className="avatar-preview"
                 src={photoDataUrl}
                 alt="Ваше лицо"
-                style={{ marginTop: "0.5rem" }}
+                style={{ marginTop: "0.5rem", marginInline: "auto" }}
               />
             ) : null}
             {error ? (
@@ -142,21 +142,17 @@ export function StartScreen({
             ) : null}
           </div>
 
-          <div className="btn-row">
+          <div className="btn-row" style={{ justifyContent: "center" }}>
             <button
               type="button"
               className="btn"
               disabled={!ready}
               onClick={onContinue}
             >
-              Начать анкету
+              Начать сборку вечера
             </button>
           </div>
         </div>
-      </div>
-
-      <div className="brand-hero__visual" aria-hidden>
-        <span>Режиссура вечера</span>
       </div>
     </section>
   );

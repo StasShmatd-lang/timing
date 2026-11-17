@@ -67,6 +67,10 @@ img {
   padding: 1.25rem 0 5.5rem;
 }
 
+.main-stage:has(.brand-hero--center) {
+  width: min(720px, calc(100% - 2rem));
+}
+
 .site-footer {
   position: sticky;
   bottom: 0;
@@ -100,38 +104,47 @@ img {
 }
 
 .brand-hero {
-  display: grid;
-  gap: 1.5rem;
-  align-items: end;
   min-height: calc(100vh - 7rem);
-  padding: 1rem 0 2rem;
+  padding: 1.5rem 0 2rem;
   position: relative;
   overflow: hidden;
 }
 
-.brand-hero::before {
+.brand-hero--center {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.brand-hero--center::before {
   content: "";
   position: absolute;
-  inset: 8% -5% auto 35%;
-  height: 70%;
+  inset: -10% 10% auto;
+  height: 55%;
   background:
-    radial-gradient(circle at 30% 40%, rgba(201, 162, 39, 0.22), transparent 45%),
-    radial-gradient(circle at 70% 60%, rgba(196, 92, 62, 0.18), transparent 40%);
-  filter: blur(8px);
+    radial-gradient(circle at 50% 40%, rgba(201, 162, 39, 0.22), transparent 55%),
+    radial-gradient(circle at 50% 80%, rgba(196, 92, 62, 0.14), transparent 50%);
+  filter: blur(10px);
   pointer-events: none;
   animation: glowPulse 6s ease-in-out infinite alternate;
 }
 
-.brand-hero__copy {
+.brand-hero__center {
   position: relative;
   z-index: 1;
-  max-width: 34rem;
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .brand-logo {
-  width: min(220px, 58vw);
+  width: min(200px, 52vw);
   height: auto;
-  margin-bottom: 1.4rem;
+  margin: 0 auto 1.2rem;
   filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.35));
   animation: riseIn 0.9s ease both;
 }
@@ -139,7 +152,7 @@ img {
 .brand-hero h1 {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(2.6rem, 7vw, 4.4rem);
+  font-size: clamp(2.5rem, 6.5vw, 4rem);
   line-height: 0.95;
   letter-spacing: -0.02em;
   margin: 0 0 0.85rem;
@@ -147,7 +160,7 @@ img {
 }
 
 .brand-hero p {
-  margin: 0 0 1.6rem;
+  margin: 0 auto 1.5rem;
   color: var(--mist);
   font-size: 1.05rem;
   line-height: 1.55;
@@ -155,40 +168,26 @@ img {
   animation: riseIn 0.9s ease 0.16s both;
 }
 
-.brand-hero__visual {
-  position: relative;
-  z-index: 1;
-  min-height: 220px;
-  border-radius: 2px;
-  background:
-    linear-gradient(135deg, rgba(19, 88, 104, 0.35), rgba(7, 22, 28, 0.2)),
-    repeating-linear-gradient(
-      -18deg,
-      transparent,
-      transparent 14px,
-      rgba(232, 242, 240, 0.03) 14px,
-      rgba(232, 242, 240, 0.03) 15px
-    );
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  animation: riseIn 1s ease 0.2s both;
+.start-form {
+  width: 100%;
+  text-align: left;
+  animation: riseIn 0.9s ease 0.22s both;
 }
 
-.brand-hero__visual span {
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
+.q-step--centered {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.section-chip {
+  display: inline-block;
+  margin: 0 0 0.75rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(201, 162, 39, 0.35);
   color: var(--gold-soft);
-  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  opacity: 0.85;
-}
-
-@media (min-width: 860px) {
-  .brand-hero {
-    grid-template-columns: 1.1fr 0.9fr;
-  }
 }
 
 .btn {
@@ -336,102 +335,179 @@ img {
   gap: 0.5rem;
 }
 
-.start-form {
-  max-width: 480px;
-}
-
 .q-step {
   animation: riseIn 0.45s ease both;
 }
 
-/* Doodle */
-.doodle {
-  position: relative;
-  min-height: calc(100vh - 8rem);
+/* Mario side-scroller */
+.mario {
   display: grid;
   gap: 1rem;
 }
 
-.doodle-stage {
+.mario__intro h2 {
+  font-family: var(--font-display);
+  margin: 0.35rem 0 0.25rem;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+}
+
+.mario-stage {
   position: relative;
-  height: min(70vh, 640px);
+  height: min(42vh, 380px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba(7, 22, 28, 0.2), rgba(7, 22, 28, 0.65)),
-    repeating-linear-gradient(
-      180deg,
-      transparent 0,
-      transparent 54px,
-      rgba(232, 242, 240, 0.04) 54px,
-      rgba(232, 242, 240, 0.04) 55px
-    );
+  background: linear-gradient(180deg, #0a2430 0%, #07161c 70%);
 }
 
-.doodle-world {
+.mario-world {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  transition: transform 0.05s linear;
+}
+
+.mario-sky {
   position: absolute;
   inset: 0;
-  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(201, 162, 39, 0.12), transparent 35%),
+    radial-gradient(circle at 70% 10%, rgba(19, 88, 104, 0.35), transparent 40%);
 }
 
-.platform {
+.mario-ground {
   position: absolute;
-  left: 8%;
-  right: 8%;
-  height: 64px;
+  left: 0;
+  bottom: 0;
+  height: 72px;
+  background:
+    linear-gradient(180deg, #1a4a3a 0%, #0d2a22 40%, #081810 100%),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 18px,
+      rgba(232, 242, 240, 0.04) 18px,
+      rgba(232, 242, 240, 0.04) 19px
+    );
+  border-top: 2px solid rgba(201, 162, 39, 0.35);
+}
+
+.mario-flag {
+  position: absolute;
+  bottom: 72px;
+  width: 160px;
+  z-index: 2;
+}
+
+.mario-flag__pole {
+  width: 4px;
+  height: 110px;
+  margin-left: 18px;
+  background: linear-gradient(180deg, var(--gold-soft), #8a7018);
+}
+
+.mario-flag__plate {
+  position: absolute;
+  left: 22px;
+  top: 8px;
+  min-width: 140px;
+  padding: 0.45rem 0.55rem;
+  background: rgba(7, 22, 28, 0.92);
   border: 1px solid rgba(201, 162, 39, 0.35);
-  background: linear-gradient(180deg, rgba(19, 88, 104, 0.55), rgba(7, 22, 28, 0.85));
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem;
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 2px;
 }
 
-.platform:hover {
-  border-color: var(--gold);
-}
-
-.platform.is-active {
-  box-shadow: 0 0 0 1px var(--gold), 0 12px 40px rgba(201, 162, 39, 0.18);
-  transform: scale(1.01);
-}
-
-.platform.is-done {
-  border-color: rgba(232, 242, 240, 0.28);
-}
-
-.platform__title {
+.mario-flag__plate strong {
+  display: block;
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.15;
 }
 
-.platform__meta {
+.mario-flag__plate span {
   color: var(--gold-soft);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
-.player {
+.mario-flag.is-past .mario-flag__plate {
+  border-color: rgba(232, 242, 240, 0.25);
+  opacity: 0.72;
+}
+
+.mario-flag.is-active .mario-flag__plate {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.35), 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.mario-trail {
   position: absolute;
-  width: 56px;
-  height: 56px;
+  bottom: 78px;
+  width: 36px;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(201, 162, 39, 0.35);
+  z-index: 1;
+}
+
+.mario-player {
+  position: absolute;
+  z-index: 8;
   border-radius: 50%;
   border: 2px solid var(--gold);
-  object-fit: cover;
-  transition: top 0.7s cubic-bezier(0.22, 1, 0.36, 1), left 0.5s ease;
-  z-index: 5;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-.player-fallback {
+  overflow: hidden;
+  background: var(--teal);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   display: grid;
   place-items: center;
-  background: var(--teal);
-  color: var(--gold-soft);
+  will-change: left, bottom;
+}
+
+.mario-player img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mario-player span {
   font-weight: 700;
+  color: var(--gold-soft);
+}
+
+.mario-player.is-running {
+  animation: runBob 0.28s ease-in-out infinite alternate;
+}
+
+.mario-progress-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+}
+
+.mario-progress-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(232, 242, 240, 0.18);
+}
+
+.mario-progress-dots span.done {
+  background: var(--gold);
+}
+
+.mario-progress-dots span.now {
+  background: var(--ember);
+  box-shadow: 0 0 0 3px rgba(196, 92, 62, 0.25);
+}
+
+@keyframes runBob {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(4deg);
+  }
 }
 
 .stage-card {
@@ -471,21 +547,20 @@ img {
 .waiter,
 .coordinator {
   position: absolute;
-  z-index: 6;
+  z-index: 9;
   font-size: 0.78rem;
   padding: 0.45rem 0.65rem;
   border-radius: 2px;
   animation: popIn 0.4s ease both;
+  white-space: nowrap;
 }
 
 .waiter {
-  right: 12%;
   background: rgba(196, 92, 62, 0.9);
   color: #fff;
 }
 
 .coordinator {
-  left: 12%;
   background: rgba(201, 162, 39, 0.95);
   color: #1a1406;
   font-weight: 700;
@@ -507,6 +582,7 @@ img {
   box-shadow: var(--shadow);
   z-index: 50;
   animation: slideUp 0.45s ease both;
+  pointer-events: auto;
 }
 
 .host-popup img {
